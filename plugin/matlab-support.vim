@@ -41,7 +41,7 @@ endif
 if &cp || ( exists('g:Matlab_Version') && ! exists('g:Matlab_DevelopmentOverwrite') )
 	finish
 endif
-let g:Matlab_Version= '0.8rc1'     " version number of this script; do not change
+let g:Matlab_Version= '0.8rc2'     " version number of this script; do not change
 "
 "-------------------------------------------------------------------------------
 " Auxiliary functions.   {{{1
@@ -392,7 +392,7 @@ function! Matlab_CommentCode( toggle ) range
 		if getline( i ) =~ '^%'
 			silent exe i."s/^%//"
 		elseif a:toggle
-			silent exe i."s/^/% /"
+			silent exe i."s/^/%/"
 		endif
 	endfor
 	"
@@ -488,7 +488,7 @@ function! Matlab_FunctionComment() range
 	" TODO: remove '...' operator
 	let	linestring = getline(a:firstline)
 	for i in range(a:firstline+1,a:lastline)
-		let	linestring = linestring.' '.getline(i)
+		let	linestring .= ' '.getline(i)
 	endfor
 	"
 	let res_list = s:GetFunctionParameters( linestring )
@@ -620,10 +620,9 @@ function! Matlab_CodeSnippet ( action )
 			let snippetfile = input ( a:action.' snippet ', s:Matlab_SnippetDir, 'file' )
 		endif
 		"
-		" :TODO:02.12.2013 18:01:WM: use update or leave the buffer as is?
 		" open file
 		if ! empty( snippetfile )
-			exe 'update! | split | '.a:action.' '.fnameescape( snippetfile )
+			exe 'split | '.a:action.' '.fnameescape( snippetfile )
 		endif
 	else
 		call s:ErrorMsg ( 'Unknown action "'.a:action.'".' )
@@ -673,12 +672,12 @@ function! Matlab_CheckCode() range
 	"
 	let errorf_saved = &g:errorformat
 	"
-	exe 'set errorformat='
-				\ .'%-PFILE\ %f,%-QFILEEND,'
-				\ .'L\ %l\ (C\ %c):\ %m,L\ %l\ (C\ %c-%*\\d):\ %m'
+	let &g:errorformat =
+				\  '%-PFILE %f,%-QFILEEND,'
+				\ .'L %l (C %c): %m,L %l (C %c-%*\d): %m'
 	silent exe 'cexpr errors'
 	"
-	exe 'set errorformat='.escape( errorf_saved, s:CmdLineEscChar )
+	let &g:errorformat = errorf_saved
 	"
 	if empty ( errors_mlint )
 		call s:ImportantMsg ( 'No warnings.' )
@@ -761,6 +760,29 @@ function! Matlab_IgnoreWarning() range
 	call cursor ( my_line, my_col )
 	"
 endfunction    " ----------  end of function Matlab_IgnoreWarning  ----------
+"
+"------------------------------------------------------------------------------
+"  === Templates API ===   {{{1
+"------------------------------------------------------------------------------
+"
+"------------------------------------------------------------------------------
+"  Matlab_SetMapLeader   {{{2
+"------------------------------------------------------------------------------
+function! Matlab_SetMapLeader ()
+	if exists ( 'g:Matlab_MapLeader' )
+		call mmtemplates#core#SetMapleader ( g:Matlab_MapLeader )
+	endif
+endfunction    " ----------  end of function Matlab_SetMapLeader  ----------
+"
+"------------------------------------------------------------------------------
+"  Matlab_ResetMapLeader   {{{2
+"------------------------------------------------------------------------------
+function! Matlab_ResetMapLeader ()
+	if exists ( 'g:Matlab_MapLeader' )
+		call mmtemplates#core#ResetMapleader ()
+	endif
+endfunction    " ----------  end of function Matlab_ResetMapLeader  ----------
+" }}}2
 "
 "-------------------------------------------------------------------------------
 " s:SetupTemplates : Initial loading of the templates.   {{{1
@@ -1136,28 +1158,34 @@ endfunction    " ----------  end of function Matlab_RemoveMenus  ----------
 "
 function! Matlab_Settings( verbose )
 	"
-	" :TODO:18.02.2014 14:14:WM: what to do if the template library is not loaded?
-	"
 	if     s:MSWIN | let sys_name = 'Windows'
 	elseif s:UNIX  | let sys_name = 'UNIX'
 	else           | let sys_name = 'unknown' | endif
 	"
-	let [ templ_style, msg ] = mmtemplates#core#Resource( g:Matlab_Templates, 'style' )
-	"
 	let glb_t_status = filereadable ( s:Matlab_GlbTemplateFile ) ? '' : ' (not readable)'
 	let lcl_t_status = filereadable ( s:Matlab_LclTemplateFile ) ? '' : ' (not readable)'
-	let mlint_status = executable( s:Matlab_MlintExecutable ) ? '<yes>' : '<no>'
+	let mlint_status = executable( s:Matlab_MlintExecutable ) ? '' : ' (not executable)'
 	"
 	let	txt = " Matlab-Support settings\n\n"
-				\ .'                   author :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|AUTHOR|'       )."\"\n"
-				\ .'                authorref :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|AUTHORREF|'    )."\"\n"
-				\ .'                    email :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|EMAIL|'        )."\"\n"
-				\ .'             organization :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|ORGANIZATION|' )."\"\n"
-				\ .'         copyright holder :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|COPYRIGHT|'    )."\"\n"
-				\ .'                  licence :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|LICENSE|'    )."\"\n"
-				\ .'           template style :  "'.templ_style."\"\n"
-				\ ."\n"
-				\ .'      plugin installation :  '.s:installation.' on '.sys_name."\n"
+	if exists ( 'g:Matlab_Templates' )
+		let [ templ_style, msg ] = mmtemplates#core#Resource( g:Matlab_Templates, 'style' )
+		"
+		let txt .=
+					\  '                   author :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|AUTHOR|'       )."\"\n"
+					\ .'                authorref :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|AUTHORREF|'    )."\"\n"
+					\ .'                    email :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|EMAIL|'        )."\"\n"
+					\ .'             organization :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|ORGANIZATION|' )."\"\n"
+					\ .'         copyright holder :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|COPYRIGHT|'    )."\"\n"
+					\ .'                  licence :  "'.mmtemplates#core#ExpandText( g:Matlab_Templates, '|LICENSE|'      )."\"\n"
+					\ .'           template style :  "'.templ_style."\"\n"
+					\ ."\n"
+	else
+		let txt .=
+					\  "                templates : -not loaded- \n"
+					\ ."\n"
+	endif
+	let txt .=
+				\  '      plugin installation :  '.s:installation.' on '.sys_name."\n"
 				\ .'    using template engine :  version '.g:Templates_Version." by Wolfgang Mehner\n"
 				\ ."\n"
 	if s:installation == 'system'
@@ -1166,11 +1194,11 @@ function! Matlab_Settings( verbose )
 	let txt .=
 				\  '      local template file :  '.s:Matlab_LclTemplateFile.lcl_t_status."\n"
 				\ .'       code snippets dir. :  '.s:Matlab_SnippetDir."\n"
-				\ .'       mlint path and exe :  '.s:Matlab_MlintExecutable."\n"
-				\ .'             > executable :  '.mlint_status."\n"
+				\ .'       mlint path and exe :  '.s:Matlab_MlintExecutable.mlint_status."\n"
 	if a:verbose >= 1
 		let	txt .= "\n"
 					\ .'                mapleader :  "'.g:Matlab_MapLeader."\"\n"
+					\ .'               load menus :  "'.s:Matlab_LoadMenus."\"\n"
 	endif
 	let txt .=
 				\  "________________________________________________________________________________\n"
